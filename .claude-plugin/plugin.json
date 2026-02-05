@@ -1,0 +1,13 @@
+{
+  "name": "xsql-tools",
+  "version": "1.0.0",
+  "description": "Claude Code skills for xSQL reverse engineering tools (idasql, bnsql)",
+  "author": {
+    "name": "Elias Bachaalany",
+    "email": "elias.bachaalany@gmail.com"
+  },
+  "homepage": "https://github.com/0xeb/anthropic-xsql-tools-plugin",
+  "repository": "https://github.com/0xeb/anthropic-xsql-tools-plugin",
+  "license": "MIT",
+  "keywords": ["ida", "binaryninja", "reverse-engineering", "sql", "decompilation"]
+}
