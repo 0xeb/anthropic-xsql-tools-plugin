@@ -331,6 +331,71 @@ This approach is significantly faster for iterative analysis since the database 
 
 ## Tables Reference
 
+### Debugger Tables (Full CRUD)
+
+#### breakpoints
+Debugger breakpoints. Supports full CRUD (SELECT, INSERT, UPDATE, DELETE). Breakpoints persist in the IDB even without an active debugger session.
+
+| Column | Type | RW | Description |
+|--------|------|----|-------------|
+| `address` | INT | R | Breakpoint address |
+| `enabled` | INT | RW | 1=enabled, 0=disabled |
+| `type` | INT | RW | Breakpoint type (0=software, 1=hw_write, 2=hw_read, 3=hw_rdwr, 4=hw_exec) |
+| `type_name` | TEXT | R | Type name (software, hardware_write, etc.) |
+| `size` | INT | RW | Breakpoint size (for hardware breakpoints) |
+| `flags` | INT | RW | Breakpoint flags |
+| `pass_count` | INT | RW | Pass count before trigger |
+| `condition` | TEXT | RW | Condition expression |
+| `loc_type` | INT | R | Location type code |
+| `loc_type_name` | TEXT | R | Location type (absolute, relative, symbolic, source) |
+| `module` | TEXT | R | Module path (relative breakpoints) |
+| `symbol` | TEXT | R | Symbol name (symbolic breakpoints) |
+| `offset` | INT | R | Offset (relative/symbolic) |
+| `source_file` | TEXT | R | Source file (source breakpoints) |
+| `source_line` | INT | R | Source line number |
+| `is_hardware` | INT | R | 1=hardware breakpoint |
+| `is_active` | INT | R | 1=currently active |
+| `group` | TEXT | RW | Breakpoint group name |
+| `bptid` | INT | R | Breakpoint ID |
+
+```sql
+-- List all breakpoints
+SELECT printf('0x%08X', address) as addr, type_name, enabled, condition
+FROM breakpoints;
+
+-- Add software breakpoint
+INSERT INTO breakpoints (address) VALUES (0x401000);
+
+-- Add hardware write watchpoint
+INSERT INTO breakpoints (address, type, size) VALUES (0x402000, 1, 4);
+
+-- Add conditional breakpoint
+INSERT INTO breakpoints (address, condition) VALUES (0x401000, 'eax == 0');
+
+-- Add symbolic breakpoint
+INSERT INTO breakpoints (symbol) VALUES ('CreateFileW');
+
+-- Disable a breakpoint
+UPDATE breakpoints SET enabled = 0 WHERE address = 0x401000;
+
+-- Update condition
+UPDATE breakpoints SET condition = 'ecx > 5' WHERE address = 0x401000;
+
+-- Delete a breakpoint
+DELETE FROM breakpoints WHERE address = 0x401000;
+
+-- Find which functions have breakpoints
+SELECT b.address, f.name, b.type_name, b.enabled
+FROM breakpoints b
+JOIN funcs f ON b.address >= f.address AND b.address < f.end_ea;
+
+-- Count enabled vs disabled
+SELECT
+  SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) as enabled_count,
+  SUM(CASE WHEN enabled = 0 THEN 1 ELSE 0 END) as disabled_count
+FROM breakpoints;
+```
+
 ### Entity Tables (Read-Only)
 
 #### funcs
@@ -384,7 +449,7 @@ GROUP BY calling_conv ORDER BY count DESC;
 ```
 
 #### segments
-Memory segments.
+Memory segments. Supports UPDATE (`name`, `class`, `perm`) and DELETE.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -397,6 +462,15 @@ Memory segments.
 ```sql
 -- Find executable segments
 SELECT name, printf('0x%X', start_ea) as start FROM segments WHERE perm & 1 = 1;
+
+-- Rename a segment
+UPDATE segments SET name = '.mytext' WHERE start_ea = 0x401000;
+
+-- Change permissions (R=4, W=2, X=1)
+UPDATE segments SET perm = 5 WHERE name = '.text';
+
+-- Delete a segment
+DELETE FROM segments WHERE name = '.rdata';
 ```
 
 #### names
@@ -624,17 +698,47 @@ FROM disasm_calls WHERE callee_name LIKE '%malloc%';
 
 ### Database Modification
 
-The following tables support SQL UPDATE and DELETE:
+The following tables support SQL INSERT, UPDATE, and DELETE:
 
-| Table | UPDATE columns | DELETE |
-|-------|---------------|--------|
-| `funcs` | `name` | No |
-| `names` | `name` | Yes |
-| `comments` | `comment`, `rep_comment` | Yes |
-| `bookmarks` | `description` | Yes |
-| `ctree_lvars` | `name`, `type` | No |
+| Table | INSERT | UPDATE columns | DELETE |
+|-------|--------|---------------|--------|
+| `breakpoints` | Yes (address, type, size, condition, symbol, module) | `enabled`, `type`, `size`, `flags`, `pass_count`, `condition`, `group` | Yes |
+| `funcs` | Yes (address, optional name/end_ea) | `name`, `flags` | Yes |
+| `names` | Yes (address + name required) | `name` | Yes |
+| `comments` | Yes (address + comment and/or rpt_comment) | `comment`, `rep_comment` | Yes |
+| `bookmarks` | Yes (address, optional slot/description) | `description` | Yes |
+| `segments` | — | `name`, `class`, `perm` | Yes |
+| `instructions` | — | — | Yes |
+| `types` | Yes | Yes | Yes |
+| `types_members` | Yes | Yes | Yes |
+| `types_enum_values` | Yes | Yes | Yes |
+| `ctree_lvars` | No | `name`, `type` | No |
 
-**Examples:**
+**INSERT examples:**
+```sql
+-- Create a function (IDA auto-detects boundaries)
+INSERT INTO funcs (address) VALUES (0x401000);
+
+-- Create a function with name and explicit end
+INSERT INTO funcs (address, name, end_ea) VALUES (0x401000, 'my_func', 0x401050);
+
+-- Set a name at an address
+INSERT INTO names (address, name) VALUES (0x401000, 'main');
+
+-- Add a comment
+INSERT INTO comments (address, comment) VALUES (0x401050, 'Check return value');
+
+-- Add a repeatable comment
+INSERT INTO comments (address, rpt_comment) VALUES (0x404000, 'Global config');
+
+-- Add a bookmark (auto-assigned slot)
+INSERT INTO bookmarks (address, description) VALUES (0x401000, 'interesting');
+
+-- Add a bookmark at specific slot
+INSERT INTO bookmarks (slot, address, description) VALUES (5, 0x401000, 'slot 5');
+```
+
+**UPDATE/DELETE examples:**
 ```sql
 -- Rename a function
 UPDATE funcs SET name = 'my_main' WHERE address = 0x401000;
@@ -650,6 +754,52 @@ UPDATE comments SET rep_comment = 'Global config' WHERE address = 0x404000;
 
 -- Delete a name
 DELETE FROM names WHERE address = 0x401000;
+```
+
+**Segments:**
+```sql
+-- Rename a segment
+UPDATE segments SET name = '.mytext' WHERE start_ea = 0x401000;
+
+-- Change segment class
+UPDATE segments SET class = 'DATA' WHERE name = '.rdata';
+
+-- Change permissions (R=4, W=2, X=1)
+UPDATE segments SET perm = 5 WHERE name = '.text';
+
+-- Delete a segment
+DELETE FROM segments WHERE name = '.rdata';
+```
+
+**Instructions:**
+```sql
+-- Delete an instruction (convert to unexplored bytes)
+DELETE FROM instructions WHERE address = 0x401000;
+```
+
+**Types:**
+```sql
+-- Create a new struct
+INSERT INTO types (name, kind) VALUES ('my_struct', 'struct');
+
+-- Create an enum
+INSERT INTO types (name, kind) VALUES ('my_flags', 'enum');
+
+-- Create a union
+INSERT INTO types (name, kind) VALUES ('my_union', 'union');
+
+-- Add a struct member with type
+INSERT INTO types_members (type_ordinal, member_name, member_type) VALUES (42, 'field1', 'int');
+
+-- Add a struct member (name only, default type)
+INSERT INTO types_members (type_ordinal, member_name) VALUES (42, 'field2');
+
+-- Add an enum value
+INSERT INTO types_enum_values (type_ordinal, value_name, value) VALUES (15, 'FLAG_ACTIVE', 1);
+
+-- Add an enum value with comment
+INSERT INTO types_enum_values (type_ordinal, value_name, value, comment)
+VALUES (15, 'FLAG_HIDDEN', 2, 'not visible in UI');
 ```
 
 **Decompiler local variables (requires Hex-Rays):**
@@ -2291,6 +2441,12 @@ WHERE calling_conv = 'fastcall' AND return_is_ptr = 1;
 | Functions by return type | `types_func_args WHERE arg_index = -1` |
 | Typedef-aware type queries | `types_func_args` (surface vs resolved) |
 | Hidden pointer types | `types_func_args WHERE is_ptr = 0 AND is_ptr_resolved = 1` |
+| Manage breakpoints | `breakpoints` (full CRUD) |
+| Modify segments | `segments` (UPDATE name/class/perm, DELETE) |
+| Delete instructions | `instructions` (DELETE converts to unexplored bytes) |
+| Create types | `types` (INSERT struct/enum/union) |
+| Add struct members | `types_members` (INSERT) |
+| Add enum values | `types_enum_values` (INSERT) |
 | Modify database | `*_live` tables |
 | Jump to Anything | `jump_entities('pattern', 'mode')` |
 | Entity search (JSON) | `jump_search('pattern', 'mode', limit, offset)` |
