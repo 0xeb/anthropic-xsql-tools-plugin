@@ -36,6 +36,16 @@ The skills require the CLI tools installed separately:
 - **idasql**: Place `idasql.exe` next to `ida.exe` in your IDA installation, then add IDA directory to PATH
 - **bnsql**: Add Binary Ninja DLL directory to PATH, then add `bnsql.exe` to PATH
 
+## Troubleshooting
+
+### SSH clone failure during plugin install
+
+If `/plugin install` fails with a `Permission denied (publickey)` error, git is trying to clone via SSH but you don't have SSH keys configured for GitHub. Fix by telling git to use HTTPS instead:
+
+```bash
+git config --global url."https://github.com/".insteadOf "git@github.com:"
+```
+
 ## Links
 
 - [libxsql](https://github.com/0xeb/libxsql) - Core SQL virtual table framework
