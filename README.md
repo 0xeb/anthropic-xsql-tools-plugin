@@ -1,53 +1,34 @@
-# libxsql Tools Plugin
+# 0xeb Tools Marketplace
 
-Claude Code plugin with skills for [libxsql-based](https://github.com/0xeb/libxsql) reverse engineering tools.
+A Claude Code plugin marketplace for reverse engineering, binary analysis, and general purpose utilities.
 
 ## Installation
 
-```bash
-# Add the marketplace
-/plugin marketplace add https://raw.githubusercontent.com/0xeb/anthropic-xsql-tools-plugin/main/marketplace.json
-
-# Install plugin
-/plugin install xsql-tools@0xeb-tools
+```
+/plugin marketplace add 0xeb/anthropic-xsql-tools-plugin
 ```
 
-## Skills Included
-
-| Skill | Description | Requires |
-|-------|-------------|----------|
-| `idasql` | SQL interface to IDA Pro databases | idasql CLI, IDA Pro license |
-| `bnsql` | SQL interface to Binary Ninja databases | bnsql CLI, Binary Ninja license |
-
-## Usage
-
-Once installed, the skills are automatically available:
+Then browse and install:
 
 ```
-"Using idasql, count the functions in test.i64"
-"Using bnsql, find strings containing 'error' in malware.bndb"
-"Decompile main in C:/path/to/database.i64"
+/plugin menu
 ```
 
-## Tool Installation
+## Available Plugins
 
-The skills require the CLI tools installed separately:
+### Reverse Engineering
 
-- **idasql**: Place `idasql.exe` next to `ida.exe` in your IDA installation, then add IDA directory to PATH
-- **bnsql**: Add Binary Ninja DLL directory to PATH, then add `bnsql.exe` to PATH
+| Plugin | Description |
+|--------|-------------|
+| [bnsql](plugins/bnsql/) | SQL interface to Binary Ninja databases |
+| [idasql](plugins/idasql/) | SQL interface to IDA Pro databases |
 
 ## Troubleshooting
 
 ### SSH clone failure during plugin install
 
-If `/plugin install` fails with a `Permission denied (publickey)` error, git is trying to clone via SSH but you don't have SSH keys configured for GitHub. Fix by telling git to use HTTPS instead:
+If `/plugin install` fails with a `Permission denied (publickey)` error:
 
 ```bash
 git config --global url."https://github.com/".insteadOf "git@github.com:"
 ```
-
-## Links
-
-- [libxsql](https://github.com/0xeb/libxsql) - Core SQL virtual table framework
-- [idasql](https://github.com/allthingsida/idasql) - IDA Pro SQL interface
-- [bnsql](https://github.com/0xeb/bnsql) - Binary Ninja SQL interface

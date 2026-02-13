@@ -1,7 +1,11 @@
 ---
 name: bnsql
-description: Execute SQL queries against Binary Ninja databases using bnsql CLI - query functions, xrefs, strings, decompile code
-allowed-tools: Bash, Read, Glob, Grep
+description: "Execute SQL queries against Binary Ninja databases using bnsql CLI - query functions, xrefs, strings, decompile code"
+allowed-tools:
+  - Bash
+  - Read
+  - Glob
+  - Grep
 ---
 
 # CRITICAL: Execution Behavior

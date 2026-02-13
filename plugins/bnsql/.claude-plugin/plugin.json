@@ -1,0 +1,13 @@
+{
+  "name": "bnsql",
+  "version": "1.0.0",
+  "description": "SQL interface to Binary Ninja databases for querying functions, xrefs, strings, and decompiled code",
+  "author": {
+    "name": "Elias Bachaalany",
+    "email": "elias.bachaalany@gmail.com"
+  },
+  "homepage": "https://github.com/0xeb/bnsql",
+  "repository": "https://github.com/0xeb/anthropic-xsql-tools-plugin",
+  "license": "MIT",
+  "keywords": ["binaryninja", "reverse-engineering", "sql", "decompilation"]
+}

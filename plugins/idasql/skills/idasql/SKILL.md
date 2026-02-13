@@ -1,7 +1,11 @@
 ---
 name: idasql
-description: Execute SQL queries against IDA Pro databases using idasql CLI - query functions, xrefs, strings, decompile code
-allowed-tools: Bash, Read, Glob, Grep
+description: "Execute SQL queries against IDA Pro databases using idasql CLI - query functions, xrefs, strings, decompile code"
+allowed-tools:
+  - Bash
+  - Read
+  - Glob
+  - Grep
 ---
 
 # CRITICAL: Execution Behavior
@@ -713,6 +717,7 @@ The following tables support SQL INSERT, UPDATE, and DELETE:
 | `types_members` | Yes | Yes | Yes |
 | `types_enum_values` | Yes | Yes | Yes |
 | `ctree_lvars` | No | `name`, `type` | No |
+| `pseudocode` | No | `comment`, `comment_placement` | No |
 
 **INSERT examples:**
 ```sql
@@ -845,21 +850,37 @@ SELECT save_database();
 **CRITICAL:** Always filter by `func_addr`. Without constraint, these tables will decompile EVERY function - extremely slow!
 
 #### pseudocode
-Decompiled C-like code lines. **Use `decompile(addr)` function instead for simple decompilation!**
+Decompiled C-like code lines with writable comments. **Use `decompile(addr)` function for viewing, pseudocode table for surgical edits.**
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `func_addr` | INT | Function address |
-| `line_num` | INT | Line number |
-| `line` | TEXT | Pseudocode text |
-| `ea` | INT | Corresponding assembly address |
+| Column | Type | Writable | Description |
+|--------|------|----------|-------------|
+| `func_addr` | INT | No | Function address |
+| `line_num` | INT | No | Line number |
+| `line` | TEXT | No | Pseudocode text |
+| `ea` | INT | No | Corresponding assembly address (from COLOR_ADDR anchor) |
+| `comment` | TEXT | **Yes** | Decompiler comment at this ea |
+| `comment_placement` | TEXT | **Yes** | Comment placement: `semi` (inline, default), `block1` (above line) |
+
+**Comment placements:** `semi` (after `;`), `block1` (own line above), `block2`, `curly1`, `curly2`, `colon`, `case`, `else`, `do`
 
 ```sql
--- PREFERRED: Use decompile() function for full pseudocode
+-- PREFERRED: Use decompile() for viewing (includes /* ea */ prefixes)
 SELECT decompile(0x401000);
 
--- Only use pseudocode table when you need line-level details (ea mapping, etc.)
-SELECT line_num, line, ea FROM pseudocode WHERE func_addr = 0x401000;
+-- Use pseudocode table for surgical comment editing
+UPDATE pseudocode SET comment = 'buffer overflow here'
+WHERE func_addr = 0x401000 AND ea = 0x401020;
+
+-- Block comment (appears on own line above the statement)
+UPDATE pseudocode SET comment_placement = 'block1', comment = 'vulnerable call'
+WHERE func_addr = 0x401000 AND ea = 0x401020;
+
+-- Delete a comment
+UPDATE pseudocode SET comment = NULL
+WHERE func_addr = 0x401000 AND ea = 0x401020;
+
+-- View with ea and comments
+SELECT ea, line, comment FROM pseudocode WHERE func_addr = 0x401000;
 ```
 
 #### ctree
@@ -1351,13 +1372,18 @@ SELECT decode_insn(0x401000);
 ```
 
 ### Decompilation
+
+**When to use `decompile()` vs `pseudocode` table:**
+- **To view/show pseudocode** → always use `SELECT decompile(addr)`. Returns the full function as a single text block with `/* ea */` address prefixes. This is fast, efficient, and what you should use when the user asks to "decompile", "show the code", or "show the pseudocode".
+- **To read specific lines or columns** → query the `pseudocode` table. If you already have the full output from `decompile()`, refer to it directly. Only query the table when you need structured access (e.g. filtering by ea, reading comment values).
+- **To add/edit/delete comments** → `UPDATE pseudocode SET comment = '...' WHERE func_addr = X AND ea = Y`. The pseudocode table is the write interface for decompiler comments.
+
 | Function | Description |
 |----------|-------------|
-| `decompile(addr)` | **PREFERRED** - Full pseudocode as single text (requires Hex-Rays) |
+| `decompile(addr)` | **PREFERRED** — Full pseudocode with `/* ea */` prefixes (requires Hex-Rays) |
+| `decompile(addr, 1)` | Same but forces re-decompilation (use after writing comments or renaming variables) |
 | `list_lvars(addr)` | List local variables as JSON |
 | `rename_lvar(addr, old, new)` | Rename a local variable |
-
-**IMPORTANT:** To decompile a function, use `decompile(addr)` - NOT the pseudocode table!
 
 ```sql
 -- CORRECT: Get full decompilation in one call
@@ -2259,8 +2285,8 @@ SELECT * FROM imports WHERE name LIKE '%socket%' OR name LIKE '%connect%' OR nam
 -- Basic info
 SELECT * FROM funcs WHERE address = 0x401000;
 
--- Pseudocode (if Hex-Rays available)
-SELECT line FROM pseudocode WHERE func_addr = 0x401000 ORDER BY line_num;
+-- Decompile (if Hex-Rays available)
+SELECT decompile(0x401000);
 
 -- Local variables
 SELECT name, type, size FROM ctree_lvars WHERE func_addr = 0x401000;
@@ -2427,7 +2453,8 @@ WHERE calling_conv = 'fastcall' AND return_is_ptr = 1;
 | Find strings | `strings` |
 | Configure string types | `rebuild_strings(types, minlen)` |
 | Instruction analysis | `instructions WHERE func_addr = X` |
-| Decompiled code | `pseudocode WHERE func_addr = X` |
+| View decompiled code | `decompile(addr)` |
+| Edit decompiler comments | `UPDATE pseudocode SET comment = '...' WHERE func_addr = X AND ea = Y` |
 | AST pattern matching | `ctree WHERE func_addr = X` |
 | Call patterns | `ctree_v_calls`, `disasm_calls` |
 | Control flow | `ctree_v_loops`, `ctree_v_ifs` |
