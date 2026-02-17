@@ -400,7 +400,7 @@ SELECT
 FROM breakpoints;
 ```
 
-### Entity Tables (Read-Only)
+### Entity Tables
 
 #### funcs
 All detected functions in the binary with prototype information.
@@ -709,7 +709,7 @@ The following tables support SQL INSERT, UPDATE, and DELETE:
 | `breakpoints` | Yes (address, type, size, condition, symbol, module) | `enabled`, `type`, `size`, `flags`, `pass_count`, `condition`, `group` | Yes |
 | `funcs` | Yes (address, optional name/end_ea) | `name`, `flags` | Yes |
 | `names` | Yes (address + name required) | `name` | Yes |
-| `comments` | Yes (address + comment and/or rpt_comment) | `comment`, `rep_comment` | Yes |
+| `comments` | Yes (address + comment and/or rpt_comment) | `comment`, `rpt_comment` | Yes |
 | `bookmarks` | Yes (address, optional slot/description) | `description` | Yes |
 | `segments` | — | `name`, `class`, `perm` | Yes |
 | `instructions` | — | — | Yes |
@@ -755,7 +755,7 @@ UPDATE names SET name = 'my_global' WHERE address = 0x404000;
 UPDATE comments SET comment = 'Check return value' WHERE address = 0x401050;
 
 -- Add repeatable comment
-UPDATE comments SET rep_comment = 'Global config' WHERE address = 0x404000;
+UPDATE comments SET rpt_comment = 'Global config' WHERE address = 0x404000;
 
 -- Delete a name
 DELETE FROM names WHERE address = 0x401000;
@@ -1087,7 +1087,7 @@ Convenience views for filtering types:
 | `types_v_enums` | `SELECT * FROM types WHERE is_enum = 1` |
 | `types_v_typedefs` | `SELECT * FROM types WHERE is_typedef = 1` |
 | `types_v_funcs` | `SELECT * FROM types WHERE is_func = 1` |
-| `local_types` | Legacy compatibility view |
+| `local_types` | All local types (ordinal, name, definition, flags) |
 
 ### Extended Tables
 
@@ -2474,7 +2474,7 @@ WHERE calling_conv = 'fastcall' AND return_is_ptr = 1;
 | Create types | `types` (INSERT struct/enum/union) |
 | Add struct members | `types_members` (INSERT) |
 | Add enum values | `types_enum_values` (INSERT) |
-| Modify database | `*_live` tables |
+
 | Jump to Anything | `jump_entities('pattern', 'mode')` |
 | Entity search (JSON) | `jump_search('pattern', 'mode', limit, offset)` |
 
