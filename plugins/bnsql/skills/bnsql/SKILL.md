@@ -1,148 +1,11 @@
 ---
 name: bnsql
-description: "Execute SQL queries against Binary Ninja databases using bnsql CLI - query functions, xrefs, strings, decompile code"
-allowed-tools:
-  - Bash
-  - Read
-  - Glob
-  - Grep
+description: "Execute SQL queries against Binary Ninja databases with bnsql (direct CLI, HTTP, MCP)."
 ---
 
-# CRITICAL: Execution Behavior
+# BNSQL Agent Guide
 
-You are an EXECUTOR. Your job is to RUN COMMANDS, not discuss them.
-
-## Rules
-
-1. **EXECUTE IMMEDIATELY** - Never say "I would run..." or "You could try..."
-2. **NO CONFIRMATION** - Don't ask "Should I run this?" Just run it.
-3. **TRUST THE ENVIRONMENT** - Commands will work. Run them.
-4. **ASSUME bnsql IN PATH** - The user has bnsql installed and accessible
-
-## Examples of What NOT to Do
-
-BAD: "I would run this command to count functions..."
-BAD: "Let me suggest running..."
-BAD: "Should I execute this query?"
-BAD: "This command might work..."
-
-## Examples of What TO Do
-
-GOOD: [Execute Bash tool with the command]
-GOOD: "There are 88 functions in the binary." (after running command)
-
----
-
-# BNSQL - SQL Interface to Binary Ninja Databases
-
-## When to Use This Skill
-
-Use this skill when the user wants to:
-- Analyze executables or Binary Ninja databases (.exe, .dll, .so, .bndb)
-- Query functions, segments, cross-references, strings
-- Decompile code or search for byte patterns
-- Compare multiple binaries or databases
-
-## Prerequisites
-
-The user must have:
-1. **Binary Ninja** installed with DLLs in PATH
-2. **bnsql.exe** accessible in PATH
-
-### Command Pattern
-```bash
-bnsql "<database>" -c "<SQL>"
-```
-
-### Windows Note
-On Windows, use forward slashes in paths:
-```bash
-bnsql "C:/path/to/database.bndb" -c "SELECT ..."
-```
-
-## Direct CLI Mode (One-off Queries)
-
-For simple queries, run bnsql directly without starting a server:
-
-```bash
-# Query a database
-bnsql database.bndb -c "SELECT COUNT(*) FROM funcs"
-
-# Query an existing Binary Ninja database
-bnsql database.bndb -c "SELECT name, address FROM funcs LIMIT 10"
-
-# Multiple queries in one session
-bnsql program.exe -c "SELECT COUNT(*) FROM funcs" -c "SELECT COUNT(*) FROM strings"
-```
-
-Use direct CLI mode when:
-- Running a single query or a few queries
-- Analyzing a file for the first time
-- No need to keep the database open
-
-## HTTP Server Mode (Persistent Queries)
-
-Use HTTP mode when:
-- Running many queries against the same database
-- Comparing multiple databases simultaneously
-- Keeping analysis results cached between queries
-
-### Starting a Server
-
-```bash
-# Start server for a single database (random port)
-bnsql database.bndb --http 0
-
-# With specific port
-bnsql database.bndb --http 8081
-
-# With authentication token
-bnsql database.bndb --http 8081 --token mysecret
-
-# Bind to all interfaces (for remote access)
-bnsql database.bndb --http 8081 --bind 0.0.0.0
-```
-
-### Querying via curl
-
-```bash
-# Execute SQL query
-curl -X POST http://localhost:8081/query -d "SELECT name, size FROM funcs LIMIT 5"
-
-# With authentication
-curl -X POST http://localhost:8081/query \
-     -H "Authorization: Bearer mysecret" \
-     -d "SELECT * FROM funcs"
-
-# Check server status
-curl http://localhost:8081/status
-```
-
-### Response Format
-
-```json
-{"success": true, "columns": ["name", "size"], "rows": [["main", "500"]], "row_count": 1}
-```
-
-```json
-{"success": false, "error": "no such table: bad_table"}
-```
-
-### HTTP Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Welcome message |
-| `/help` | GET | API documentation |
-| `/query` | POST | Execute SQL (body = raw SQL) |
-| `/status` | GET | Health check with stats |
-| `/shutdown` | POST | Stop server gracefully |
-
----
-
-# BNSQL Skill Guide
-
-A comprehensive reference for using BNSQL - an SQL interface for reverse engineering binary analysis with Binary Ninja.
+A comprehensive reference for AI agents to effectively use BNSQL - an SQL interface for reverse engineering binary analysis with Binary Ninja.
 
 ---
 
@@ -1097,6 +960,26 @@ SELECT f.name, COALESCE(c.n, 0) FROM funcs f LEFT JOIN counts c ON c.to_ea = f.a
 
 ---
 
+## Summary: When to Use What
+
+| Goal | Table/Function |
+|------|----------------|
+| List all functions | `funcs` |
+| Find who calls what | `xrefs` with `is_code = 1` |
+| Find data references | `xrefs` with `is_code = 0` |
+| Analyze imports | `imports` |
+| Find strings | `strings` |
+| Instruction analysis | `instructions WHERE func_addr = X` |
+| Binary metadata | `db_info` |
+| **Decompile a function** | `decompile(addr)` or `decompile(addr, limit)` |
+| **Find local variables** | `hlil_vars WHERE func_addr = X` |
+| **Find function calls (HLIL)** | `hlil_calls WHERE func_addr = X` |
+| **Search pseudocode** | `pseudocode WHERE line LIKE '%pattern%'` |
+
+**Remember:** Always use `func_addr = X` constraints on `instructions`, `hlil_vars`, `hlil_calls`, and `pseudocode` tables.
+
+---
+
 ## REPL Commands
 
 When running in interactive mode (`bnsql database.bndb -i`), these dot-commands are available:
@@ -1173,44 +1056,6 @@ curl http://localhost:8081/status
 
 ```json
 {"success": false, "error": "no such table: bad_table"}
-```
-
----
-
-### Raw TCP Server (Legacy)
-
-Binary protocol with length-prefixed JSON. Use only when HTTP is not available.
-
-**Starting the server:**
-```bash
-bnsql database.bndb --server 13337
-bnsql database.bndb --server 13337 --token mysecret
-```
-
-**Connecting as client:**
-```bash
-bnsql --remote localhost:13337 -c "SELECT name FROM funcs LIMIT 5"
-bnsql --remote localhost:13337 -i
-```
-
-**Wire Protocol:**
-- Format: `[4-byte length (big-endian uint32)] [JSON payload]`
-- Request: `{"sql": "SELECT ...", "token": "optional"}`
-- Response: `{"success": true, "columns": [...], "rows": [[...]], "row_count": N}`
-
-**Python Example:**
-```python
-import socket, struct, json
-
-def bnsql_query(sql, host="localhost", port=13337, token=None):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((host, port))
-    req = {"sql": sql}
-    if token: req["token"] = token
-    payload = json.dumps(req).encode()
-    s.sendall(struct.pack(">I", len(payload)) + payload)
-    resp_len = struct.unpack(">I", s.recv(4))[0]
-    return json.loads(s.recv(resp_len))
 ```
 
 ---
@@ -1354,23 +1199,3 @@ int64_t sub_401000(int64_t arg1) {
 | Find what X calls | `callees WHERE func_addr = X` | `xrefs WHERE from_func = X AND is_code = 1` |
 | Bulk call graph analysis | `callees`/`callers` views | Use `xrefs` with `from_func` directly |
 | Get names at the end | Join `funcs` in every CTE | Join `funcs` only in final SELECT |
-
----
-
-## Summary: When to Use What
-
-| Goal | Table/Function |
-|------|----------------|
-| List all functions | `funcs` |
-| Find who calls what | `xrefs` with `is_code = 1` |
-| Find data references | `xrefs` with `is_code = 0` |
-| Analyze imports | `imports` |
-| Find strings | `strings` |
-| Instruction analysis | `instructions WHERE func_addr = X` |
-| Binary metadata | `db_info` |
-| **Decompile a function** | `decompile(addr)` or `decompile(addr, limit)` |
-| **Find local variables** | `hlil_vars WHERE func_addr = X` |
-| **Find function calls (HLIL)** | `hlil_calls WHERE func_addr = X` |
-| **Search pseudocode** | `pseudocode WHERE line LIKE '%pattern%'` |
-
-**Remember:** Always use `func_addr = X` constraints on `instructions`, `hlil_vars`, `hlil_calls`, and `pseudocode` tables.
