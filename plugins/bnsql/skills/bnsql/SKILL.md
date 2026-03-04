@@ -3,9 +3,9 @@ name: bnsql
 description: "Execute SQL queries against Binary Ninja databases with bnsql (direct CLI, HTTP, MCP)."
 ---
 
-# BNSQL Agent Guide
+# BNSQL Skill Guide
 
-A comprehensive reference for AI agents to effectively use BNSQL - an SQL interface for reverse engineering binary analysis with Binary Ninja.
+A comprehensive reference for using BNSQL - an SQL interface for reverse engineering binary analysis with Binary Ninja.
 
 ---
 
@@ -994,17 +994,17 @@ When running in interactive mode (`bnsql database.bndb -i`), these dot-commands 
 | `.http start` | Start HTTP server on random port |
 | `.http stop` | Stop HTTP server |
 | `.http status` | Show HTTP server status |
-| `.agent` | Start AI agent mode |
+| `.clear` | Clear session |
 
 ---
 
 ## Server Modes
 
-BNSQL supports two server protocols for remote queries: **HTTP REST** (recommended) and raw TCP.
+BNSQL supports two server protocols for remote queries: **HTTP REST** (recommended for programmatic access) and **MCP** (for AI tool integration).
 
 ---
 
-### HTTP REST Server (Recommended)
+### HTTP REST Server (Recommended for programmatic access)
 
 Standard REST API that works with curl, any HTTP client, or LLM tools.
 
@@ -1057,6 +1057,29 @@ curl http://localhost:8081/status
 ```json
 {"success": false, "error": "no such table: bad_table"}
 ```
+
+---
+
+### MCP Server (Model Context Protocol)
+
+For integration with Claude Desktop, Cursor, and other MCP-compatible AI tools.
+
+**Starting the server:**
+```bash
+# Default port 9998
+bnsql database.bndb --mcp
+
+# Custom port
+bnsql database.bndb --mcp 9999
+```
+
+**MCP Tools Exposed:**
+
+| Tool | Description |
+|------|-------------|
+| `sql_query` | Execute SQL query against the Binary Ninja database |
+
+**Usage:** Start the MCP server, then configure your MCP client to connect to `http://localhost:9998/sse`.
 
 ---
 

@@ -663,16 +663,6 @@ Quick capability matrix:
 | `types_enum_values` | Yes | Yes | Yes |
 | `ctree_lvars` | — | `name`, `type`, `comment` | — |
 
-Write support is covered by integration/e2e tests in:
-- `tests/idasql/write_operations_phase3_test.cpp`
-- `tests/idasql/save_database_test.cpp`
-- `tests/idasql/breakpoints_table_test.cpp`
-- `tests/idasql/comments_table_test.cpp`
-- `tests/idasql/names_table_test.cpp`
-- `tests/idasql/bytes_table_test.cpp`
-- `tests/idasql/patch_functions_test.cpp`
-- `tests/idasql/patched_bytes_table_test.cpp`
-
 Type/decompiler write examples:
 ```sql
 -- Create a new struct
@@ -896,8 +886,6 @@ WHERE returns_arg = 1;
 #### types
 
 All local type definitions. Supports INSERT (create struct/union/enum), UPDATE, and DELETE.
-Integration/e2e coverage includes `tests/idasql/write_operations_phase3_test.cpp` and `tests/idasql/types_table_test.cpp`.
-
 | Column | Type | Description |
 |--------|------|-------------|
 | `ordinal` | INT | Type ordinal |
